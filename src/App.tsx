@@ -6,8 +6,22 @@ import { Settings } from "lucide-react";
 import type { FormData } from "./types";
 
 /* ================== REMOTO ================== */
-const API_FORMS = "/api/forms";
-const ADMIN_PASSWORD = "F@ives25"; // precisa bater com a env na Vercel
+// Base via env (VITE_API_BASE) ou fallback no ngrok informado.
+// Também remove uma letra "v" acidental no final (.appv → .app).
+const RAW_BASE =
+  (import.meta?.env?.VITE_API_BASE as string | undefined) ??
+  "https://45c7a7634d0e.ngrok-free.appv";
+const API_BASE = RAW_BASE.replace(/\/+$/, "").replace(/v$/, "");
+const API_FORMS = `${API_BASE}/api/forms`;
+const ADMIN_PASSWORD = "F@ives25"; // deve bater com o backend
+
+// Header para pular o aviso do ngrok
+const IS_NGROK = API_BASE.toLowerCase().includes("ngrok");
+function makeHeaders(extra: Record<string, string> = {}) {
+  const h: Record<string, string> = { ...extra };
+  if (IS_NGROK) h["ngrok-skip-browser-warning"] = "true";
+  return h;
+}
 
 type RemoteItem = {
   id: string;
@@ -43,7 +57,7 @@ async function postRemote(item: FormData) {
   try {
     const res = await fetch(API_FORMS, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: makeHeaders({ "content-type": "application/json" }),
       body: JSON.stringify(item),
     });
     if (!res.ok) {
@@ -62,7 +76,7 @@ async function getRemote(adminKey: string): Promise<FormData[]> {
   try {
     const res = await fetch(API_FORMS, {
       method: "GET",
-      headers: { "x-admin-key": adminKey },
+      headers: makeHeaders({ "x-admin-key": adminKey }),
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -81,10 +95,10 @@ async function putRemote(all: FormData[], adminKey: string) {
   try {
     const res = await fetch(API_FORMS, {
       method: "PUT",
-      headers: {
+      headers: makeHeaders({
         "content-type": "application/json",
         "x-admin-key": adminKey,
-      },
+      }),
       body: JSON.stringify({ items: all }),
     });
     if (!res.ok) {
@@ -118,7 +132,6 @@ function App() {
     if (ok) {
       setIsAdmin(true);
       setShowAdminLogin(false);
-      // carrega remoto e popula estado
       getRemote(password).then((remote) => setFormData(remote));
       return true;
     }
@@ -128,7 +141,7 @@ function App() {
   const handleAdminLogout = () => {
     setIsAdmin(false);
     setShowAdminLogin(false);
-    setFormData([]); // limpa do estado ao sair
+    setFormData([]);
   };
 
   // Atualizações vindas do painel (editar/excluir/limpar) -> PUT remoto
