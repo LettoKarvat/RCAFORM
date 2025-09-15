@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import FormularioRCA from "./components/FormularioRCA";
 import AdminLogin from "./components/AdminLogin";
 import AdminPanel from "./components/AdminPanel";
 import { Settings } from "lucide-react";
 import type { FormData } from "./types";
 
-/* ================== CONFIG REMOTA ================== */
+/* ================== REMOTO ================== */
 const API_FORMS = "/api/forms";
-const ADMIN_PASSWORD = "F@ives25"; // opcional: mova p/ .env e peça no AdminLogin
+const ADMIN_PASSWORD = "F@ives25"; // precisa bater com a env na Vercel
 
 type RemoteItem = {
   id: string;
@@ -19,7 +19,6 @@ type RemoteItem = {
 type RemoteListResponse = { items: RemoteItem[]; total: number };
 
 function normalizeFormData(x: any): FormData {
-  // garante campos básicos mesmo se vier algo faltando
   const id =
     x?.id ||
     x?.data?.id ||
@@ -59,11 +58,11 @@ async function postRemote(item: FormData) {
   }
 }
 
-async function getRemote(): Promise<FormData[]> {
+async function getRemote(adminKey: string): Promise<FormData[]> {
   try {
     const res = await fetch(API_FORMS, {
       method: "GET",
-      headers: { "x-admin-key": ADMIN_PASSWORD },
+      headers: { "x-admin-key": adminKey },
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
@@ -78,14 +77,13 @@ async function getRemote(): Promise<FormData[]> {
   }
 }
 
-/** Sobrescreve todo o arquivo remoto (PUT) */
-async function putRemote(all: FormData[]) {
+async function putRemote(all: FormData[], adminKey: string) {
   try {
     const res = await fetch(API_FORMS, {
       method: "PUT",
       headers: {
         "content-type": "application/json",
-        "x-admin-key": ADMIN_PASSWORD,
+        "x-admin-key": adminKey,
       },
       body: JSON.stringify({ items: all }),
     });
@@ -100,52 +98,28 @@ async function putRemote(all: FormData[]) {
     return false;
   }
 }
-/* =================================================== */
+/* =========================================== */
 
 function App() {
   const [formData, setFormData] = useState<FormData[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
 
-  // carrega local na inicialização
-  useEffect(() => {
-    const savedData = localStorage.getItem("rca_form_data");
-    if (savedData) {
-      try {
-        const arr: any[] = JSON.parse(savedData);
-        setFormData(arr.map((x) => normalizeFormData(x)));
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    }
-  }, []);
-
-  // helper para salvar local
-  const saveLocal = (arr: FormData[]) => {
-    setFormData(arr);
-    localStorage.setItem("rca_form_data", JSON.stringify(arr));
-  };
-
-  // submit do formulário: salva local e remoto
+  // Enviar formulário: só remoto (sem localStorage)
   const handleFormSubmit = async (data: FormData) => {
     const normalized = normalizeFormData(data);
-    const updatedData = [...formData, normalized];
-    saveLocal(updatedData);
-
-    // remoto (best-effort)
-    await postRemote(normalized);
+    const ok = await postRemote(normalized);
+    if (!ok) alert("Falha ao enviar dados. Verifique a rede/servidor.");
   };
 
-  // login admin: valida senha e puxa do remoto
+  // Login admin: carrega do remoto e mostra painel
   const handleAdminLogin = (password: string): boolean => {
     const ok = password === ADMIN_PASSWORD;
     if (ok) {
       setIsAdmin(true);
       setShowAdminLogin(false);
-      // carrega remoto e substitui local (best-effort)
-      getRemote().then((remote) => {
-        if (remote.length) saveLocal(remote);
-      });
+      // carrega remoto e popula estado
+      getRemote(password).then((remote) => setFormData(remote));
       return true;
     }
     return false;
@@ -154,20 +128,14 @@ function App() {
   const handleAdminLogout = () => {
     setIsAdmin(false);
     setShowAdminLogin(false);
+    setFormData([]); // limpa do estado ao sair
   };
 
-  // alterações feitas no AdminPanel (editar/excluir/limpar):
+  // Atualizações vindas do painel (editar/excluir/limpar) -> PUT remoto
   const handleUpdateData = async (updatedData: FormData[]) => {
-    const normalized = updatedData.map((x) => normalizeFormData(x));
-    saveLocal(normalized);
-    // tenta sincronizar remoto (PUT sobrescrevendo tudo)
-    const ok = await putRemote(normalized);
-    if (!ok) {
-      // não trava a UI; apenas loga
-      console.warn(
-        "Sincronização remota falhou; dados mantidos apenas localmente."
-      );
-    }
+    const ok = await putRemote(updatedData, ADMIN_PASSWORD);
+    if (ok) setFormData(updatedData);
+    else alert("Não consegui salvar no servidor. Tente novamente.");
   };
 
   if (isAdmin) {
