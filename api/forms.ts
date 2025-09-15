@@ -1,12 +1,17 @@
 // api/forms.ts
-export const config = { runtime: "edge" }; // roda no Edge, mais rápido
+// ✅ Node.js runtime (Serverless) — funciona com @vercel/blob e process.env
+export const config = { runtime: "nodejs" };
+
+// Silencia o TS sem precisar instalar @types/node
+// (se quiser, pode instalar: pnpm add -D @types/node e remover a linha abaixo)
+declare const process: any;
+
 import { head, put } from "@vercel/blob";
 
 type Submission = {
   id: string;
   createdAt: string;
   data: any;
-  // opcional: quem enviou
   ip?: string | null;
   ua?: string | null;
 };
@@ -16,59 +21,57 @@ const CONTENT_TYPE = "application/json";
 
 async function readAll(): Promise<Submission[]> {
   try {
-    const meta = await head(JSON_PATH); // pega url do blob pelo pathname
-    const res = await fetch(meta.downloadUrl || meta.url);
+    const meta: any = await head(JSON_PATH);
+    const url = meta.downloadUrl || meta.url;
+    const res = await fetch(url);
     if (!res.ok) return [];
     return (await res.json()) as Submission[];
   } catch {
-    // se ainda não existe, começa vazio
     return [];
   }
 }
 
 async function writeAll(items: Submission[]) {
   await put(JSON_PATH, JSON.stringify(items, null, 2), {
-    access: "public", // Blob precisa de 'public'
-    allowOverwrite: true, // sobrescrever o mesmo arquivo
-    addRandomSuffix: false, // mantém o mesmo path
+    access: "public",
+    allowOverwrite: true,
+    addRandomSuffix: false,
     contentType: CONTENT_TYPE,
   });
 }
 
-function okJSON(body: any, init?: ResponseInit) {
-  return new Response(JSON.stringify(body), {
-    ...init,
-    headers: { "content-type": CONTENT_TYPE, ...(init?.headers || {}) },
-  });
-}
-function errJSON(status: number, message: string) {
-  return okJSON({ message }, { status });
+function okJSON(res: any, body: any, status = 200) {
+  res
+    .status(status)
+    .setHeader("content-type", CONTENT_TYPE)
+    .send(JSON.stringify(body));
 }
 
-export default async function handler(req: Request) {
-  const url = new URL(req.url);
-  const method = req.method.toUpperCase();
+export default async function handler(req: any, res: any) {
+  const method = (req.method || "GET").toUpperCase();
 
   if (method === "GET") {
-    // (opcional) bloqueio simples com senha via header
-    const adminPw = (process.env.ADMIN_PASSWORD || "").trim();
-    const sent = (req.headers.get("x-admin-key") || "").trim();
+    // proteção simples via header x-admin-key
+    const adminPw = (process?.env?.ADMIN_PASSWORD || "").trim();
+    const sent = String(req.headers["x-admin-key"] || "").trim();
     if (adminPw && (!sent || sent !== adminPw)) {
-      return errJSON(401, "Não autorizado");
+      return okJSON(res, { message: "Não autorizado" }, 401);
     }
     const items = await readAll();
-    return okJSON({ items, total: items.length });
+    return okJSON(res, { items, total: items.length });
   }
 
   if (method === "POST") {
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return errJSON(400, "JSON inválido");
+    let body = req.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        return okJSON(res, { message: "JSON inválido" }, 400);
+      }
     }
     if (!body || typeof body !== "object") {
-      return errJSON(400, "Corpo deve ser um objeto JSON");
+      return okJSON(res, { message: "Corpo deve ser um objeto JSON" }, 400);
     }
 
     const items = await readAll();
@@ -78,17 +81,43 @@ export default async function handler(req: Request) {
         Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8),
       createdAt: now,
       data: body,
-      ip: req.headers.get("x-forwarded-for"),
-      ua: req.headers.get("user-agent"),
+      ip: (req.headers["x-forwarded-for"] as string) || null,
+      ua: (req.headers["user-agent"] as string) || null,
     };
     items.push(newItem);
     await writeAll(items);
-    return okJSON(newItem, { status: 201 });
+    return okJSON(res, newItem, 201);
   }
 
-  if (method === "OPTIONS") {
-    return new Response(null, { status: 204 });
+  if (method === "PUT") {
+    // sobrescreve o arquivo com a lista inteira enviada
+    let body = req.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch {
+        return okJSON(res, { message: "JSON inválido" }, 400);
+      }
+    }
+    if (!body || typeof body !== "object" || !Array.isArray(body.items)) {
+      return okJSON(res, { message: "Esperado { items: [...] }" }, 400);
+    }
+
+    const now = new Date().toISOString();
+    const items: Submission[] = body.items.map((it: any) => ({
+      id:
+        String(it?.id) ||
+        Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8),
+      createdAt: String(it?.timestamp || it?.createdAt || now),
+      data: it,
+    }));
+
+    await writeAll(items);
+    return okJSON(res, { saved: items.length });
   }
 
-  return errJSON(405, "Método não suportado");
+  if (method === "OPTIONS") return res.status(204).end();
+
+  res.setHeader("allow", "GET,POST,PUT,OPTIONS");
+  return okJSON(res, { message: "Método não suportado" }, 405);
 }
