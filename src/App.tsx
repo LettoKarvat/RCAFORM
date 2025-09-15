@@ -10,7 +10,7 @@ import type { FormData } from "./types";
 // Também remove uma letra "v" acidental no final (.appv → .app).
 const RAW_BASE =
   (import.meta?.env?.VITE_API_BASE as string | undefined) ??
-  "https://45c7a7634d0e.ngrok-free.appv";
+  "https://ae5c335ef7e7.ngrok-free.app";
 const API_BASE = RAW_BASE.replace(/\/+$/, "").replace(/v$/, "");
 const API_FORMS = `${API_BASE}/api/forms`;
 const ADMIN_PASSWORD = "F@ives25"; // deve bater com o backend
