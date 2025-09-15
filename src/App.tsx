@@ -5,35 +5,147 @@ import AdminPanel from "./components/AdminPanel";
 import { Settings } from "lucide-react";
 import type { FormData } from "./types";
 
+/* ================== CONFIG REMOTA ================== */
+const API_FORMS = "/api/forms";
+const ADMIN_PASSWORD = "F@ives25"; // opcional: mova p/ .env e peça no AdminLogin
+
+type RemoteItem = {
+  id: string;
+  createdAt: string;
+  data: any;
+  ip?: string | null;
+  ua?: string | null;
+};
+type RemoteListResponse = { items: RemoteItem[]; total: number };
+
+function normalizeFormData(x: any): FormData {
+  // garante campos básicos mesmo se vier algo faltando
+  const id =
+    x?.id ||
+    x?.data?.id ||
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const timestamp =
+    x?.timestamp ||
+    x?.data?.timestamp ||
+    x?.createdAt ||
+    new Date().toISOString();
+
+  return {
+    id,
+    timestamp,
+    codigoRca: x?.codigoRca ?? x?.data?.codigoRca ?? "",
+    numeroPedido: x?.numeroPedido ?? x?.data?.numeroPedido ?? "",
+    forma: x?.forma ?? x?.data?.forma ?? "",
+    descricaoOutros: x?.descricaoOutros ?? x?.data?.descricaoOutros ?? "",
+  } as FormData;
+}
+
+async function postRemote(item: FormData) {
+  try {
+    const res = await fetch(API_FORMS, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(item),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      console.warn("POST remoto falhou:", j);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn("POST remoto erro:", e);
+    return false;
+  }
+}
+
+async function getRemote(): Promise<FormData[]> {
+  try {
+    const res = await fetch(API_FORMS, {
+      method: "GET",
+      headers: { "x-admin-key": ADMIN_PASSWORD },
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      console.warn("GET remoto falhou:", j);
+      return [];
+    }
+    const j = (await res.json()) as RemoteListResponse;
+    return (j.items || []).map((it) => normalizeFormData(it));
+  } catch (e) {
+    console.warn("GET remoto erro:", e);
+    return [];
+  }
+}
+
+/** Sobrescreve todo o arquivo remoto (PUT) */
+async function putRemote(all: FormData[]) {
+  try {
+    const res = await fetch(API_FORMS, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        "x-admin-key": ADMIN_PASSWORD,
+      },
+      body: JSON.stringify({ items: all }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      console.warn("PUT remoto falhou:", j);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn("PUT remoto erro:", e);
+    return false;
+  }
+}
+/* =================================================== */
+
 function App() {
   const [formData, setFormData] = useState<FormData[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
 
-  const ADMIN_PASSWORD = "F@ives25";
-
+  // carrega local na inicialização
   useEffect(() => {
-    // Load data from localStorage
     const savedData = localStorage.getItem("rca_form_data");
     if (savedData) {
       try {
-        setFormData(JSON.parse(savedData));
+        const arr: any[] = JSON.parse(savedData);
+        setFormData(arr.map((x) => normalizeFormData(x)));
       } catch (error) {
         console.error("Error loading data:", error);
       }
     }
   }, []);
 
-  const handleFormSubmit = (data: FormData) => {
-    const updatedData = [...formData, data];
-    setFormData(updatedData);
-    localStorage.setItem("rca_form_data", JSON.stringify(updatedData));
+  // helper para salvar local
+  const saveLocal = (arr: FormData[]) => {
+    setFormData(arr);
+    localStorage.setItem("rca_form_data", JSON.stringify(arr));
   };
 
+  // submit do formulário: salva local e remoto
+  const handleFormSubmit = async (data: FormData) => {
+    const normalized = normalizeFormData(data);
+    const updatedData = [...formData, normalized];
+    saveLocal(updatedData);
+
+    // remoto (best-effort)
+    await postRemote(normalized);
+  };
+
+  // login admin: valida senha e puxa do remoto
   const handleAdminLogin = (password: string): boolean => {
-    if (password === ADMIN_PASSWORD) {
+    const ok = password === ADMIN_PASSWORD;
+    if (ok) {
       setIsAdmin(true);
       setShowAdminLogin(false);
+      // carrega remoto e substitui local (best-effort)
+      getRemote().then((remote) => {
+        if (remote.length) saveLocal(remote);
+      });
       return true;
     }
     return false;
@@ -44,9 +156,18 @@ function App() {
     setShowAdminLogin(false);
   };
 
-  const handleUpdateData = (updatedData: FormData[]) => {
-    setFormData(updatedData);
-    localStorage.setItem("rca_form_data", JSON.stringify(updatedData));
+  // alterações feitas no AdminPanel (editar/excluir/limpar):
+  const handleUpdateData = async (updatedData: FormData[]) => {
+    const normalized = updatedData.map((x) => normalizeFormData(x));
+    saveLocal(normalized);
+    // tenta sincronizar remoto (PUT sobrescrevendo tudo)
+    const ok = await putRemote(normalized);
+    if (!ok) {
+      // não trava a UI; apenas loga
+      console.warn(
+        "Sincronização remota falhou; dados mantidos apenas localmente."
+      );
+    }
   };
 
   if (isAdmin) {

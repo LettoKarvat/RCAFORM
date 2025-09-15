@@ -1,6 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { LogOut, Download, Trash2, Search, Calendar, User, Hash, Radio, Clock, FileText, Edit, X, Save } from 'lucide-react';
-import type { FormData } from '../types';
+import React, { useState, useEffect } from "react";
+import {
+  LogOut,
+  Download,
+  Trash2,
+  Search,
+  Hash,
+  Radio,
+  Clock,
+  FileText,
+  Edit,
+  X,
+  Save,
+  User,
+} from "lucide-react";
+import type { FormData } from "../types";
 
 interface AdminPanelProps {
   onLogout: () => void;
@@ -8,46 +21,54 @@ interface AdminPanelProps {
   onUpdateData: (updatedData: FormData[]) => void;
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+const AdminPanel: React.FC<AdminPanelProps> = ({
+  onLogout,
+  data,
+  onUpdateData,
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
   const [filteredData, setFilteredData] = useState<FormData[]>(data);
-  const [sortBy, setSortBy] = useState<'timestamp' | 'codigoRca' | 'numeroPedido'>('timestamp');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortBy, setSortBy] = useState<
+    "timestamp" | "codigoRca" | "numeroPedido"
+  >("timestamp");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<FormData>>({});
 
   const formasDisponiveis = [
-    'midia da tv',
-    'radio',
-    'digital',
-    'instagram',
-    'facebook',
-    'whatsapp',
-    'indicação',
-    'carro',
-    'outros'
-  ];
+    "midia da tv",
+    "radio",
+    "digital",
+    "instagram",
+    "facebook",
+    "whatsapp",
+    "indicação",
+    "carro",
+    "outros",
+  ] as const;
 
   useEffect(() => {
-    let filtered = data.filter((item) =>
-      item.codigoRca.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.numeroPedido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.forma.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.descricaoOutros && item.descricaoOutros.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    let filtered = data.filter((item) => {
+      const s = searchTerm.toLowerCase();
+      return (
+        item.codigoRca.toLowerCase().includes(s) ||
+        item.numeroPedido.toLowerCase().includes(s) ||
+        item.forma.toLowerCase().includes(s) ||
+        (item.descricaoOutros && item.descricaoOutros.toLowerCase().includes(s))
+      );
+    });
 
-    // Sort data
     filtered.sort((a, b) => {
-      let aValue: string | number = a[sortBy];
-      let bValue: string | number = b[sortBy];
+      let aValue: string | number = a[sortBy] as any;
+      let bValue: string | number = b[sortBy] as any;
 
-      if (sortBy === 'timestamp') {
+      if (sortBy === "timestamp") {
         aValue = new Date(aValue as string).getTime();
         bValue = new Date(bValue as string).getTime();
       }
 
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
 
@@ -65,70 +86,102 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData })
   };
 
   const handleSaveEdit = () => {
-    if (!editingId || !editForm.codigoRca || !editForm.numeroPedido || !editForm.forma) {
-      alert('Todos os campos obrigatórios devem ser preenchidos');
+    if (
+      !editingId ||
+      !editForm.codigoRca ||
+      !editForm.numeroPedido ||
+      !editForm.forma
+    ) {
+      alert("Todos os campos obrigatórios devem ser preenchidos");
       return;
     }
-
-    if (editForm.forma === 'outros' && !editForm.descricaoOutros) {
+    if (editForm.forma === "outros" && !editForm.descricaoOutros) {
       alert('Descrição é obrigatória quando "outros" é selecionado');
       return;
     }
 
-    const updatedData = data.map(item => 
-      item.id === editingId 
-        ? { ...item, ...editForm, descricaoOutros: editForm.forma === 'outros' ? editForm.descricaoOutros : undefined }
+    const updatedData = data.map((item) =>
+      item.id === editingId
+        ? {
+            ...item,
+            ...editForm,
+            descricaoOutros:
+              editForm.forma === "outros" ? editForm.descricaoOutros || "" : "",
+          }
         : item
     );
-    
+
     onUpdateData(updatedData);
     setEditingId(null);
     setEditForm({});
   };
 
   const handleDelete = (id: string) => {
-    const item = data.find(d => d.id === id);
-    if (window.confirm(`Tem certeza que deseja excluir o registro do RCA ${item?.codigoRca}?`)) {
-      const updatedData = data.filter(item => item.id !== id);
+    const item = data.find((d) => d.id === id);
+    if (
+      window.confirm(
+        `Tem certeza que deseja excluir o registro do RCA ${item?.codigoRca}?`
+      )
+    ) {
+      const updatedData = data.filter((item) => item.id !== id);
       onUpdateData(updatedData);
     }
   };
 
   const formatDate = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString('pt-BR');
+    return new Date(timestamp).toLocaleString("pt-BR");
   };
 
   const exportToCSV = () => {
     if (filteredData.length === 0) {
-      alert('Não há dados para exportar');
+      alert("Não há dados para exportar");
       return;
     }
 
-    const headers = ['Data/Hora', 'Código RCA', 'Número Pedido', 'Forma', 'Descrição Outros'];
+    const headers = [
+      "Data/Hora",
+      "Código RCA",
+      "Número Pedido",
+      "Forma",
+      "Descrição Outros",
+    ];
     const csvContent = [
-      headers.join(','),
-      ...filteredData.map(item => [
-        formatDate(item.timestamp),
-        item.codigoRca,
-        item.numeroPedido,
-        item.forma,
-        item.descricaoOutros || ''
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n');
+      headers.join(","),
+      ...filteredData.map((item) =>
+        [
+          formatDate(item.timestamp),
+          item.codigoRca,
+          item.numeroPedido,
+          item.forma,
+          item.descricaoOutros || "",
+        ]
+          .map((field) => `"${String(field).replaceAll(`"`, `""`)}"`)
+          .join(",")
+      ),
+    ].join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `dados-rca-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `dados-rca-${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const clearAllData = () => {
-    if (window.confirm('Tem certeza que deseja excluir todos os dados? Esta ação não pode ser desfeita.')) {
+    if (
+      window.confirm(
+        "Tem certeza que deseja excluir todos os dados? Esta ação não pode ser desfeita."
+      )
+    ) {
       onUpdateData([]);
     }
   };
@@ -145,7 +198,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData })
                 Painel Administrativo
               </h1>
               <p className="text-gray-300 mt-2">
-                {data.length} {data.length === 1 ? 'registro encontrado' : 'registros encontrados'}
+                {data.length}{" "}
+                {data.length === 1
+                  ? "registro encontrado"
+                  : "registros encontrados"}
               </p>
             </div>
             <button
@@ -177,9 +233,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData })
             <select
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
-                const [field, order] = e.target.value.split('-');
-                setSortBy(field as 'timestamp' | 'codigoRca' | 'numeroPedido');
-                setSortOrder(order as 'asc' | 'desc');
+                const [field, order] = e.target.value.split("-");
+                setSortBy(field as "timestamp" | "codigoRca" | "numeroPedido");
+                setSortOrder(order as "asc" | "desc");
               }}
               className="px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
             >
@@ -203,6 +259,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData })
               <button
                 onClick={clearAllData}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg"
+                title="Excluir todos"
               >
                 <Trash2 className="w-5 h-5" />
               </button>
@@ -214,10 +271,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData })
             <div className="text-center py-16">
               <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-600 mb-2">
-                {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum dado disponível'}
+                {searchTerm
+                  ? "Nenhum resultado encontrado"
+                  : "Nenhum dado disponível"}
               </h3>
               <p className="text-gray-500">
-                {searchTerm ? 'Tente alterar os termos de busca' : 'Os dados aparecerão aqui após serem enviados pelo formulário'}
+                {searchTerm
+                  ? "Tente alterar os termos de busca"
+                  : "Os dados aparecerão aqui após serem enviados pelo formulário"}
               </p>
             </div>
           ) : (
@@ -226,9 +287,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData })
                 <table className="w-full">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        Data/Hora
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          Data/Hora
+                        </div>
                       </th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                         <div className="flex items-center gap-2">
@@ -248,119 +311,147 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, data, onUpdateData })
                           Forma
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Descrição</th>
-                     <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Ações</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                        Descrição
+                      </th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                       {editingId === item.id ? (
-                         <>
-                           <td className="px-6 py-4 text-sm text-gray-900 font-mono">
-                             {formatDate(item.timestamp)}
-                           </td>
-                           <td className="px-6 py-4">
-                             <input
-                               type="text"
-                               value={editForm.codigoRca || ''}
-                               onChange={(e) => setEditForm({...editForm, codigoRca: e.target.value})}
-                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                             />
-                           </td>
-                           <td className="px-6 py-4">
-                             <input
-                               type="text"
-                               value={editForm.numeroPedido || ''}
-                               onChange={(e) => setEditForm({...editForm, numeroPedido: e.target.value})}
-                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                             />
-                           </td>
-                           <td className="px-6 py-4">
-                             <select
-                               value={editForm.forma || ''}
-                               onChange={(e) => setEditForm({...editForm, forma: e.target.value})}
-                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                             >
-                               <option value="">Selecione</option>
-                               {formasDisponiveis.map((opcao) => (
-                                 <option key={opcao} value={opcao}>
-                                   {opcao.charAt(0).toUpperCase() + opcao.slice(1)}
-                                 </option>
-                               ))}
-                             </select>
-                           </td>
-                           <td className="px-6 py-4">
-                             {editForm.forma === 'outros' ? (
-                               <input
-                                 type="text"
-                                 value={editForm.descricaoOutros || ''}
-                                 onChange={(e) => setEditForm({...editForm, descricaoOutros: e.target.value})}
-                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                 placeholder="Descreva..."
-                               />
-                             ) : (
-                               <span className="text-gray-400">-</span>
-                             )}
-                           </td>
-                           <td className="px-6 py-4">
-                             <div className="flex items-center justify-center gap-2">
-                               <button
-                                 onClick={handleSaveEdit}
-                                 className="bg-green-600 hover:bg-green-700 text-white p-1.5 rounded transition-colors"
-                                 title="Salvar"
-                               >
-                                 <Save className="w-4 h-4" />
-                               </button>
-                               <button
-                                 onClick={handleCancelEdit}
-                                 className="bg-gray-600 hover:bg-gray-700 text-white p-1.5 rounded transition-colors"
-                                 title="Cancelar"
-                               >
-                                 <X className="w-4 h-4" />
-                               </button>
-                             </div>
-                           </td>
-                         </>
-                       ) : (
-                         <>
-                           <td className="px-6 py-4 text-sm text-gray-900 font-mono">
-                             {formatDate(item.timestamp)}
-                           </td>
-                           <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                             {item.codigoRca}
-                           </td>
-                           <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                             {item.numeroPedido}
-                           </td>
-                           <td className="px-6 py-4 text-sm text-gray-900">
-                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                               {item.forma}
-                             </span>
-                           </td>
-                           <td className="px-6 py-4 text-sm text-gray-900">
-                             {item.descricaoOutros || '-'}
-                           </td>
-                           <td className="px-6 py-4">
-                             <div className="flex items-center justify-center gap-2">
-                               <button
-                                 onClick={() => handleEdit(item)}
-                                 className="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition-colors"
-                                 title="Editar"
-                               >
-                                 <Edit className="w-4 h-4" />
-                               </button>
-                               <button
-                                 onClick={() => handleDelete(item.id)}
-                                 className="bg-red-600 hover:bg-red-700 text-white p-1.5 rounded transition-colors"
-                                 title="Excluir"
-                               >
-                                 <Trash2 className="w-4 h-4" />
-                               </button>
-                             </div>
-                           </td>
-                         </>
-                       )}
+                      <tr
+                        key={item.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        {editingId === item.id ? (
+                          <>
+                            <td className="px-6 py-4 text-sm text-gray-900 font-mono">
+                              {formatDate(item.timestamp)}
+                            </td>
+                            <td className="px-6 py-4">
+                              <input
+                                type="text"
+                                value={editForm.codigoRca || ""}
+                                onChange={(e) =>
+                                  setEditForm({
+                                    ...editForm,
+                                    codigoRca: e.target.value,
+                                  })
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <input
+                                type="text"
+                                value={editForm.numeroPedido || ""}
+                                onChange={(e) =>
+                                  setEditForm({
+                                    ...editForm,
+                                    numeroPedido: e.target.value,
+                                  })
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <select
+                                value={editForm.forma || ""}
+                                onChange={(e) =>
+                                  setEditForm({
+                                    ...editForm,
+                                    forma: e.target.value as FormData["forma"],
+                                  })
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="">Selecione</option>
+                                {formasDisponiveis.map((opcao) => (
+                                  <option key={opcao} value={opcao}>
+                                    {opcao.charAt(0).toUpperCase() +
+                                      opcao.slice(1)}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-6 py-4">
+                              {editForm.forma === "outros" ? (
+                                <input
+                                  type="text"
+                                  value={editForm.descricaoOutros || ""}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      descricaoOutros: e.target.value,
+                                    })
+                                  }
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Descreva..."
+                                />
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={handleSaveEdit}
+                                  className="bg-green-600 hover:bg-green-700 text-white p-1.5 rounded transition-colors"
+                                  title="Salvar"
+                                >
+                                  <Save className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="bg-gray-600 hover:bg-gray-700 text-white p-1.5 rounded transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-6 py-4 text-sm text-gray-900 font-mono">
+                              {formatDate(item.timestamp)}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                              {item.codigoRca}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-semibold text-gray-900">
+                              {item.numeroPedido}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {item.forma}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {item.descricaoOutros || "-"}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => handleEdit(item)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(item.id)}
+                                  className="bg-red-600 hover:bg-red-700 text-white p-1.5 rounded transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
